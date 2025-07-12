@@ -15,6 +15,7 @@ package io.trino.gateway.ha.router.schema;
 
 import jakarta.annotation.Nullable;
 
+import java.util.List;
 import java.util.Map;
 
 /**
@@ -25,10 +26,13 @@ import java.util.Map;
  Implementations of this interface are used to:
     * Specify the target routing group for a request
     * Provide additional headers that should be added to the request
+    * Report errors from external routing services
  */
 public interface RoutingGroupResponse
 {
     @Nullable String routingGroup();
 
     Map<String, String> externalHeaders();
+
+    List<String> errors();
 }

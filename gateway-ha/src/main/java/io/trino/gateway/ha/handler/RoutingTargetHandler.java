@@ -21,6 +21,7 @@ import io.trino.gateway.ha.config.ProxyBackendConfiguration;
 import io.trino.gateway.ha.handler.schema.RoutingDestination;
 import io.trino.gateway.ha.handler.schema.RoutingTargetResponse;
 import io.trino.gateway.ha.router.GatewayCookie;
+import io.trino.gateway.ha.router.RoutingException;
 import io.trino.gateway.ha.router.RoutingGroupSelector;
 import io.trino.gateway.ha.router.RoutingManager;
 import io.trino.gateway.ha.router.schema.RoutingSelectorResponse;
@@ -59,6 +60,7 @@ public class RoutingTargetHandler
     private final boolean requestAnalyserClientsUseV2Format;
     private final int requestAnalyserMaxBodySize;
     private final boolean cookiesEnabled;
+    private final boolean fallbackToAdhocOnExternalErrors;
 
     @Inject
     public RoutingTargetHandler(
@@ -73,6 +75,7 @@ public class RoutingTargetHandler
         requestAnalyserClientsUseV2Format = haGatewayConfiguration.getRequestAnalyzerConfig().isClientsUseV2Format();
         requestAnalyserMaxBodySize = haGatewayConfiguration.getRequestAnalyzerConfig().getMaxBodySize();
         cookiesEnabled = GatewayCookieConfigurationPropertiesProvider.getInstance().isEnabled();
+        fallbackToAdhocOnExternalErrors = haGatewayConfiguration.getRouting().isFallbackToAdhocOnExternalErrors();
     }
 
     public RoutingTargetResponse resolveRouting(HttpServletRequest request)
@@ -96,6 +99,26 @@ public class RoutingTargetHandler
     {
         RoutingSelectorResponse routingDestination = routingGroupSelector.findRoutingDestination(request);
         String user = request.getHeader(USER_HEADER);
+        
+        // Check if external routing service returned errors
+        if (routingDestination.hasErrors()) {
+            if (fallbackToAdhocOnExternalErrors) {
+                log.warn("External routing service returned errors, falling back to adhoc: %s", 
+                        String.join(", ", routingDestination.errors()));
+                // Fall back to adhoc routing group
+                String routingGroup = "adhoc";
+                ProxyBackendConfiguration backendConfiguration = routingManager.provideBackendConfiguration(routingGroup, user);
+                String clusterHost = backendConfiguration.getProxyTo();
+                String externalUrl = backendConfiguration.getExternalUrl();
+                return new RoutingTargetResponse(
+                        new RoutingDestination(routingGroup, clusterHost, buildUriWithNewCluster(clusterHost, request), externalUrl),
+                        request);
+            } else {
+                // Propagate errors to client
+                throw new RoutingException(routingDestination.errors());
+            }
+        }
+        
         // This falls back on adhoc routing group if there is no cluster found (or value is empty) for the routing group.
         String routingGroup = (routingDestination.routingGroup() != null && !routingDestination.routingGroup().isEmpty())
                 ? routingDestination.routingGroup()

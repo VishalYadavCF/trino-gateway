@@ -13,25 +13,42 @@
  */
 package io.trino.gateway.ha.router.schema;
 
+import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
 import jakarta.annotation.Nullable;
 
+import java.util.List;
 import java.util.Map;
 
 /**
  * Response from the routing service that includes:
  * - routingGroup: The target routing group for the request (Optional)
  * - externalHeaders: Headers that can be set in the request (Currently can only be set in ExternalRoutingGroupSelector)
+ * - errors: List of errors from external routing service (Optional)
  */
-public record RoutingSelectorResponse(@Nullable String routingGroup, Map<String, String> externalHeaders)
+public record RoutingSelectorResponse(@Nullable String routingGroup, Map<String, String> externalHeaders, List<String> errors)
         implements RoutingGroupResponse
 {
     public RoutingSelectorResponse {
         externalHeaders = ImmutableMap.copyOf(externalHeaders);
+        errors = ImmutableList.copyOf(errors);
     }
 
     public RoutingSelectorResponse(String routingGroup)
     {
-        this(routingGroup, ImmutableMap.of());
+        this(routingGroup, ImmutableMap.of(), ImmutableList.of());
+    }
+
+    public RoutingSelectorResponse(String routingGroup, Map<String, String> externalHeaders)
+    {
+        this(routingGroup, externalHeaders, ImmutableList.of());
+    }
+
+    /**
+     * Check if this response contains errors from the external routing service.
+     */
+    public boolean hasErrors()
+    {
+        return !errors.isEmpty();
     }
 }

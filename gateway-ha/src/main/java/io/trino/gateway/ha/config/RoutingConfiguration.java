@@ -23,6 +23,8 @@ public class RoutingConfiguration
 
     private boolean addXForwardedHeaders = true;
 
+    private boolean fallbackToAdhocOnExternalErrors = false;
+
     public Duration getAsyncTimeout()
     {
         return asyncTimeout;
@@ -41,5 +43,15 @@ public class RoutingConfiguration
     public void setAddXForwardedHeaders(boolean addXForwardedHeaders)
     {
         this.addXForwardedHeaders = addXForwardedHeaders;
+    }
+
+    public boolean isFallbackToAdhocOnExternalErrors()
+    {
+        return fallbackToAdhocOnExternalErrors;
+    }
+
+    public void setFallbackToAdhocOnExternalErrors(boolean fallbackToAdhocOnExternalErrors)
+    {
+        this.fallbackToAdhocOnExternalErrors = fallbackToAdhocOnExternalErrors;
     }
 }
