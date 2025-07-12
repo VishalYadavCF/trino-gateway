@@ -258,6 +258,7 @@ final class TestRoutingGroupSelectorExternal
         assertThat(routingSelectorResponse.routingGroup()).isNotNull().isEqualTo("test-group");
         assertThat(routingSelectorResponse.externalHeaders().get(allowedHeaderKey)).isNotNull().isEqualTo(allowedHeaderValue);
         assertThat(routingSelectorResponse.externalHeaders().get(excludedHeaderKey)).isNull();
+        assertThat(routingSelectorResponse.hasErrors()).isFalse();
     }
 
     @Test
@@ -285,6 +286,8 @@ final class TestRoutingGroupSelectorExternal
         // Verify
         assertThat(routingSelectorResponse.routingGroup()).isNull();
         assertThat(routingSelectorResponse.externalHeaders().get(headerKey)).isNull();
+        assertThat(routingSelectorResponse.hasErrors()).isTrue();
+        assertThat(routingSelectorResponse.errors()).containsExactly("Error occurred");
     }
 
     @Test
@@ -302,6 +305,7 @@ final class TestRoutingGroupSelectorExternal
 
         assertThat(routingSelectorResponse.routingGroup()).isEqualTo("test-group");
         assertThat(routingSelectorResponse.externalHeaders()).isEmpty();
+        assertThat(routingSelectorResponse.hasErrors()).isFalse();
     }
 
     @Test
@@ -329,6 +333,7 @@ final class TestRoutingGroupSelectorExternal
         // Verify
         assertThat(routingSelectorResponse.routingGroup()).isEmpty();
         assertThat(routingSelectorResponse.externalHeaders().get(headerKey)).isNotNull().isEqualTo(headerValue);
+        assertThat(routingSelectorResponse.hasErrors()).isFalse();
     }
 
     private HttpServletRequest prepareMockRequest()

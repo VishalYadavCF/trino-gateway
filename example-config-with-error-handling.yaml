@@ -1,0 +1,71 @@
+# Example Trino Gateway Configuration with Enhanced Error Handling
+
+# Server configuration
+server:
+  applicationConnectors:
+    - type: http
+      port: 8080
+  adminConnectors:
+    - type: http
+      port: 8081
+
+# Routing configuration with new error handling options
+routing:
+  # When external routing service returns errors, should we fall back to adhoc cluster?
+  # false (default): Propagate errors to client for better visibility
+  # true: Fall back to adhoc cluster for high availability
+  fallbackToAdhocOnExternalErrors: false
+  
+  # Other existing routing options
+  asyncTimeout: 2m
+  addXForwardedHeaders: true
+
+# External routing service configuration
+routingRules:
+  rulesEngineEnabled: false
+  rulesExternalConfiguration:
+    urlPath: "http://external-routing-service:8080/route"
+    excludeHeaders:
+      - "Content-Length"
+      - "Authorization"
+
+# Backend clusters
+backends:
+  - name: "production"
+    proxyTo: "http://trino-production:8080"
+    active: true
+    routingGroup: "production"
+  
+  - name: "staging" 
+    proxyTo: "http://trino-staging:8080"
+    active: true
+    routingGroup: "staging"
+    
+  - name: "adhoc"
+    proxyTo: "http://trino-adhoc:8080" 
+    active: true
+    routingGroup: "adhoc"
+
+# Example external routing service responses:
+
+# Success response:
+# {
+#   "routingGroup": "production",
+#   "externalHeaders": {
+#     "X-Query-Priority": "high"
+#   },
+#   "errors": []
+# }
+
+# Error response (will be propagated to client if fallbackToAdhocOnExternalErrors=false):
+# {
+#   "routingGroup": null,
+#   "externalHeaders": {},
+#   "errors": [
+#     "User not authorized for production cluster",
+#     "Query exceeds resource limits"
+#   ]
+# }
+
+# With fallbackToAdhocOnExternalErrors=true, the above error would result in
+# routing to the adhoc cluster instead of returning an error to the client.

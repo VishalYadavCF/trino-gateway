@@ -98,10 +98,12 @@ public class ExternalRoutingGroupSelector
 
             // Check the response and return the routing group
             if (response == null) {
-                throw new RuntimeException("Unexpected response: null");
+                log.error("Unexpected response: null from external routing service at %s", uri);
+                return new RoutingSelectorResponse(servletRequest.getHeader(ROUTING_GROUP_HEADER));
             }
             else if (response.errors() != null && !response.errors().isEmpty()) {
-                throw new RuntimeException("Response with error: " + String.join(", ", response.errors()));
+                log.warn("External routing service returned errors: %s", String.join(", ", response.errors()));
+                return new RoutingSelectorResponse(null, Map.of(), response.errors());
             }
 
             // Filter out excluded headers and null values
