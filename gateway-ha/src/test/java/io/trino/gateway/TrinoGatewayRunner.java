@@ -13,16 +13,23 @@
  */
 package io.trino.gateway;
 
+import com.google.common.io.Resources;
 import io.airlift.log.Logger;
 import io.airlift.log.Logging;
 import io.trino.gateway.ha.HaGatewayLauncher;
+import io.trino.gateway.ha.config.DataStoreConfiguration;
+import io.trino.gateway.ha.persistence.FlywayMigration;
+import org.jdbi.v3.core.Jdbi;
+import org.testcontainers.containers.JdbcDatabaseContainer;
 import org.testcontainers.mysql.MySQLContainer;
 import org.testcontainers.postgresql.PostgreSQLContainer;
 import org.testcontainers.trino.TrinoContainer;
 
+import java.io.IOException;
 import java.util.List;
 
 import static io.trino.gateway.ha.util.TestcontainersUtils.createPostgreSqlContainer;
+import static java.nio.charset.StandardCharsets.UTF_8;
 import static org.testcontainers.utility.MountableFile.forClasspathResource;
 
 public final class TrinoGatewayRunner
@@ -48,19 +55,17 @@ public final class TrinoGatewayRunner
         postgres.withUsername("trino_gateway_db_admin");
         postgres.withPassword("P0stG&es");
         postgres.withDatabaseName("trino_gateway_db");
-        postgres.withCopyFileToContainer(forClasspathResource("gateway-ha-persistence-postgres.sql"), "/docker-entrypoint-initdb.d/1-gateway-ha-persistence-postgres.sql");
-        postgres.withCopyFileToContainer(forClasspathResource("add_backends_postgres.sql"), "/docker-entrypoint-initdb.d/2-add_backends_postgres.sql");
         postgres.setPortBindings(List.of("5432:5432"));
         postgres.start();
+        migrateAndSeed(postgres, "add_backends_postgres.sql");
 
         MySQLContainer mysql = new MySQLContainer("mysql:5.7");
         mysql.withUsername("root");
         mysql.withPassword("root123");
         mysql.withDatabaseName("trinogateway");
-        mysql.withCopyFileToContainer(forClasspathResource("gateway-ha-persistence-mysql.sql"), "/docker-entrypoint-initdb.d/1-gateway-ha-persistence-mysql.sql");
-        mysql.withCopyFileToContainer(forClasspathResource("add_backends_mysql.sql"), "/docker-entrypoint-initdb.d/2-add_backends_mysql.sql");
         mysql.setPortBindings(List.of("3306:3306"));
         mysql.start();
+        migrateAndSeed(mysql, "add_backends_mysql.sql");
 
         OpenTracingCollector tracingCollector = new OpenTracingCollector();
         tracingCollector.start();
@@ -69,5 +74,28 @@ public final class TrinoGatewayRunner
 
         log.info("======== SERVER STARTED ========");
         log.info("Tracing: http://localhost:16686");
+    }
+
+    /**
+     * Creates the schema with the same Flyway migrations the gateway runs on startup,
+     * then seeds the sample backends. Seed data can only be inserted once the tables
+     * exist, which is why this is not done through the container's init scripts.
+     */
+    private static void migrateAndSeed(JdbcDatabaseContainer<?> container, String seedResource)
+            throws IOException
+    {
+        DataStoreConfiguration config = new DataStoreConfiguration(
+                container.getJdbcUrl(),
+                container.getUsername(),
+                container.getPassword(),
+                container.getDriverClassName(),
+                true,
+                4,
+                true);
+        FlywayMigration.migrate(config);
+
+        String seedSql = Resources.toString(Resources.getResource(seedResource), UTF_8);
+        Jdbi.create(config.getJdbcUrl(), config.getUser(), config.getPassword())
+                .useHandle(handle -> handle.createScript(seedSql).execute());
     }
 }

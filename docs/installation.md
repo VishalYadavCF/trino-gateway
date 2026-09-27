@@ -43,13 +43,26 @@ Trino Gateway requires a MySQL, PostgreSQL, or Oracle database. Database
 initialization is performed automatically when the Trino Gateway process
 starts. Migrations are performed using `Flyway`.
 
-The migration files can viewed in the `gateway-ha/src/main/resources/` folder.
-Each database type supported has its own sub-folder.
+The `Flyway` migrations are the only definition of the database schema. There
+is no separate SQL file to apply by hand: create an empty database and a user
+with permission to create and alter tables in it, point the `dataStore`
+configuration at it, and the tables are created on first startup and upgraded
+on every subsequent release.
 
-The files are also included in the JAR file.
+The migration files can be viewed in the `gateway-ha/src/main/resources/` folder.
+Each database type supported has its own sub-folder (`mysql`, `postgresql` and
+`oracle`). The files are also included in the JAR file.
 
-If you do not want migrations to be performed automatically on startup, then
-you can set `runMigrationsEnabled` to `false` in the data store configuration.
+If you do not want migrations to be performed automatically on startup, for
+example because schema changes in your environment must be applied by a
+separate deployment step or a user with elevated privileges, then you can set
+`runMigrationsEnabled` to `false` in the data store configuration. In that case
+you are responsible for applying the same versioned migrations, for example
+with the [Flyway CLI](https://documentation.red-gate.com/fd/command-line-277579359.html)
+pointed at the folder for your database type, before starting each new
+version of Trino Gateway. Do not create or alter the tables with hand-written
+DDL, as the schema would then drift from what Trino Gateway expects and later
+migrations may fail.
 
 You can also disable query history recording to the database by setting
 `queryHistoryEnabled` to `false`. This can be useful in scenarios where you
@@ -185,19 +198,10 @@ gateway instances. This table is created automatically by the database
 migrations run on startup (see [Backend database](#backend-database)), so no
 separate database or manual setup is required as long as migrations are enabled.
 If you have set `runMigrationsEnabled` to `false`, the table is not created for
-you: you must provision it manually using the DDL below, otherwise pins cannot
-be persisted and OAuth2 routing silently falls back to normal routing. For
-reference, the DDL (identical for MySQL and PostgreSQL; Oracle uses `NUMBER` for
-the `created` column) is:
-
-```sql
-CREATE TABLE IF NOT EXISTS oauth2_routing (
-oauth_id VARCHAR(256) PRIMARY KEY,
-backend_url VARCHAR (256),
-created bigint
-);
-CREATE INDEX oauth2_routing_created_idx ON oauth2_routing(created);
-```
+you: you must apply the `V5__add_oauth2_routing.sql` migration for your database
+type (see [Backend database](#backend-database)) before enabling this feature,
+otherwise pins cannot be persisted and OAuth2 routing silently falls back to
+normal routing.
 
 If the pinned coordinator becomes unhealthy or inactive, the pin is dropped
 and the client is forced to re-authenticate, since the handshake cannot be
