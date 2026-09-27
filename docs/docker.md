@@ -103,7 +103,9 @@ The release process publishes images for Trino Gateway 6 and newer to DockerHub.
 Next set the image and platform:
 
 Start Trino Gateway and its PostgreSQL backend database, and wait until the 
-health check is successful:
+health check is successful. The PostgreSQL container starts with an empty
+database, and Trino Gateway creates the schema by running its `Flyway`
+migrations on startup:
 
 ```bash
 docker compose up --wait

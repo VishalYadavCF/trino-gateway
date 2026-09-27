@@ -8,7 +8,9 @@ Gateway server running in the host operating system.
 
 The following script starts a Trino Gateway server using the 
 [Quickstart configuration](config.yaml) at http://localhost:8080.
-It also starts a dockerized PostgreSQL database at localhost:5432.
+It also starts a dockerized PostgreSQL database at localhost:5432 and creates
+an empty `gateway` database in it. The tables are created by the Trino Gateway
+`Flyway` migrations when the server starts, so no SQL needs to be run manually.
 
 To start the server, copy the script below to a temporary directory 
 under the project root folder, and run it at the temporary directory.
@@ -43,8 +45,8 @@ start_postgres_db() {
     if ! docker ps --format '{{.Names}}' | grep -q '^local-postgres$'; then
         echo "Starting PostgreSQL database container"
         PGPASSWORD=mysecretpassword
-        docker run -v "$PWD/$POSTGRES_SQL:/tmp/$POSTGRES_SQL" \
-            --name local-postgres -p 5432:5432 -e POSTGRES_PASSWORD=$PGPASSWORD -d postgres
+        docker run --name local-postgres -p 5432:5432 \
+            -e POSTGRES_PASSWORD=$PGPASSWORD -d postgres
         sleep 5
         docker exec local-postgres psql -U postgres -h localhost -c 'CREATE DATABASE gateway'
     fi

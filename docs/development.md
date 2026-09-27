@@ -9,7 +9,9 @@
 #### Running Trino Gateway in your IDE
 
 The best way to run Trino Gateway for development is to run the
-`TrinoGatewayRunner` class.
+`TrinoGatewayRunner` class. It starts the backend databases in containers,
+creates their schema with the same `Flyway` migrations used in production, and
+registers two sample Trino backends.
 You need to run `io.trino.gateway.TrinoGatewayRunner.main()` method on your IDE
 or execute the following command:
 
@@ -28,7 +30,8 @@ Run `./mvnw clean install` to build `trino-gateway`. VM options required for
 compilation and testing are specified in `.mvn/jvm.config`.
 
 Edit the configuration file `config.yaml` in the `gateway-ha` folder
-and update the mysql db information.
+and update the database connection information. The database only needs to
+exist and be empty; the schema is created by `Flyway` on startup.
 
 Note that tests using Oracle are disabled by default on non-x86_64 CPU architectures.
 To enable them, set the environment variable `TG_RUN_ORACLE_TESTS=true`. These tests
